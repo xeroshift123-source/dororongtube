@@ -87,3 +87,36 @@
     contain: none;
   }
 }
+
+.chat-header-actions { display: flex; align-items: center; gap: 10px; }
+.chat-header-actions .clear-chat-button { padding: 5px 7px; font-size: 10px; color: #f1a6ae; background: transparent; }
+.chat-header, .chat-guideline, .chat-composer { flex-shrink: 0; }
+/* Keep the composer visible: only chat history scrolls in stacked layouts. */
+@media (max-width: 760px), (max-aspect-ratio: 1/1) {
+  .app-shell:has(.watch-layout) { height: 100dvh; min-height: 0; overflow: hidden; padding-bottom: max(8px, env(safe-area-inset-bottom)); }
+  .app-shell:has(.watch-layout) > .site-header { flex-shrink: 0; }
+  .app-shell:has(.watch-layout) > main { display: flex; flex-direction: column; flex: 1; min-height: 0; width: 100%; max-width: none; }
+  .app-shell:has(.watch-layout) .room-toolbar { padding-block: 8px; flex-shrink: 0; }
+  .app-shell .watch-layout { display: flex; flex-direction: column; flex: 1; min-height: 0; max-width: none; gap: 10px; }
+  .watch-layout > .watch-main { flex-shrink: 0; width: 100%; }
+  .watch-layout .player-frame { height: min(calc((100vw - 32px) * 9 / 16), 32dvh); min-height: 0; aspect-ratio: auto; }
+  .watch-layout .waiting { min-height: 0; padding: 10px; }
+  .watch-layout .waiting-icon { margin-bottom: 6px; }
+  .watch-layout .waiting-icon svg { width: 28px; height: 28px; }
+  .watch-layout .waiting h2 { font-size: 18px; margin: 6px 0; }
+  .watch-layout .waiting-label { margin-top: 8px; }
+  .watch-layout > .chat-panel { flex: 1; height: auto; min-height: 0; contain: none; width: 100%; }
+  .watch-layout .chat-header { padding: 10px 14px; }
+  .watch-layout .chat-guideline { padding: 7px 14px; }
+  .watch-layout .message-list { padding: 6px 14px; }
+  .watch-layout .chat-composer { padding: 9px 12px; }
+  .watch-layout .composer-identity { margin-bottom: 6px; }
+  .watch-layout .chat-composer textarea { min-height: 48px; padding: 8px 10px; }
+  .app-shell:has(.watch-layout) > footer { display: none; }
+}
+@media (max-height: 600px) and (max-width: 760px), (max-height: 600px) and (max-aspect-ratio: 1/1) {
+  .app-shell:has(.watch-layout) .room-toolbar { padding-block: 4px; }
+  .watch-layout .player-frame { height: 20dvh; }
+  .watch-layout .chat-guideline { display: none; }
+  .watch-layout .waiting-icon, .watch-layout .waiting .eyebrow, .watch-layout .waiting p, .watch-layout .waiting-label { display: none; }
+}

@@ -19,6 +19,7 @@ await pg.exec(await readFile(new URL('../supabase/migrations/202610120001_room.s
 await pg.exec(await readFile(new URL('../supabase/migrations/202610120002_profile_settings.sql',import.meta.url),'utf8'))
 await pg.exec(await readFile(new URL('../supabase/migrations/202610120003_chat_cooldown.sql',import.meta.url),'utf8'))
 await pg.exec(await readFile(new URL('../supabase/migrations/202610120004_disable_room_throttle.sql',import.meta.url),'utf8'))
+await pg.exec(await readFile(new URL('../supabase/migrations/202610120005_clear_chat.sql',import.meta.url),'utf8'))
 const a='11111111-1111-4111-8111-111111111111',b='22222222-2222-4222-8222-222222222222',admin='33333333-3333-4333-8333-333333333333'
 await pg.query('insert into auth.users values ($1),($2),($3)',[a,b,admin])
 await pg.query('insert into public.admin_users(user_id) values($1)',[admin])
@@ -136,5 +137,24 @@ await pg.query("select public.send_message('ffffffff-ffff-4fff-8fff-ffffffffffff
 await fails("select public.send_message('dddddddd-dddd-4ddd-8ddd-ddddddddddde','personal cooldown still applies')")
 await fails('update public.room_clock set min_message_interval_ms=500 where id=1')
 pass('different viewers can send back-to-back; personal cooldown and settings permissions remain')
+await fails('select public.clear_chat()')
+await asUser(admin,true)
+await fails('select public.clear_chat()')
+await pg.exec('reset role')
+const clearBefore=(await pg.query('select revision from public.room_clock where id=1')).rows[0].revision
+const eventsBefore=(await pg.query('select count(*)::int as n from realtime.sent')).rows[0].n
+await asUser(admin,false)
+assert.ok(Number((await pg.query('select public.clear_chat() as n')).rows[0].n)>0)
+const cleared=(await pg.query('select public.get_chat_snapshot() as data')).rows[0].data
+assert.equal(cleared.messages.length,0)
+assert.equal(Number(cleared.revision),Number(clearBefore)+1)
+await pg.exec('reset role')
+assert.equal((await pg.query('select count(*)::int as n from realtime.sent')).rows[0].n,eventsBefore+1)
+await asUser(admin,false)
+assert.equal(Number((await pg.query('select public.clear_chat() as n')).rows[0].n),0)
+await pg.exec('reset role')
+await pg.exec('set role anon')
+await fails('select public.clear_chat()')
+pass('clear-chat requires real admin, clears history, advances revision and emits one reset')
 await pg.close()
 console.log(`${n} database checks passed (local engine; hosted Realtime still needs integration QA).`)

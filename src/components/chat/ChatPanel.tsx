@@ -7,6 +7,7 @@ import { errorText } from '../../utils/room'
 import { nicknameColor } from '../../utils/profile'
 export function ChatPanel({messages,nickname,userId,admin,status,refresh}:{messages:ChatMessage[];nickname:string;userId:string;admin:boolean;status:ConnectionStatus;refresh:()=>void}) {
   const [text,setText]=useState(''),[sending,setSending]=useState(false),[error,setError]=useState(''),[unread,setUnread]=useState(false)
+  const [clearing,setClearing]=useState(false)
   const list=useRef<HTMLDivElement>(null),atBottom=useRef(true),draft=useRef<{id:string;text:string}|null>(null)
   const [cooldownUntil,setCooldownUntil]=useState(0),[remaining,setRemaining]=useState(0)
   useEffect(()=>{
@@ -47,7 +48,14 @@ export function ChatPanel({messages,nickname,userId,admin,status,refresh}:{messa
     catch(e) { setError(`${errorText(e)} 같은 내용으로 재전송하면 중복 저장되지 않습니다.`) } finally {setSending(false)}
   }
   async function moderate(name:string,args:Record<string,unknown>) {try{await rpc(name,args);refresh();setError('')}catch(e){setError(errorText(e))}}
-  return <aside className="chat-panel" aria-label="실시간 채팅"><div className="chat-header"><h2><MessageCircle size={18}/> 실시간 채팅</h2><span className="small muted">최근 100개</span></div><div className="chat-guideline"><span className="dot green"/> 서로를 존중하는 따뜻한 대화</div>
+  async function clearChat(){
+    if(clearing||!window.confirm('모든 채팅 기록을 삭제할까요? 모든 시청자에게 적용되며 복구할 수 없습니다.'))return
+    setClearing(true);setMenu(null);setError('')
+    try{await rpc('clear_chat');refresh()}
+    catch(e){setError((e as {code?:string})?.code==='PGRST202'?'채팅 전체 삭제 기능의 추가 SQL을 먼저 실행해 주세요.':errorText(e))}
+    finally{setClearing(false)}
+  }
+  return <aside className="chat-panel" aria-label="실시간 채팅"><div className="chat-header"><h2><MessageCircle size={18}/> 실시간 채팅</h2><div className="chat-header-actions"><span className="small muted">최근 100개</span>{admin&&<button className="clear-chat-button" disabled={clearing||status!=='connected'} onClick={()=>void clearChat()} aria-label="채팅 전체 삭제"><Trash2 size={13}/>{clearing?'삭제 중…':'전체 삭제'}</button>}</div></div><div className="chat-guideline"><span className="dot green"/> 서로를 존중하는 따뜻한 대화</div>
     <div className="message-list" ref={list} role="log" aria-label="채팅 메시지" aria-live="polite" aria-relevant="additions" onScroll={()=>{const node=list.current;if(node){atBottom.current=node.scrollHeight-node.scrollTop-node.clientHeight<70;if(atBottom.current)setUnread(false)}}}>
       {messages.length===0 && <div className="empty-chat"><MessageCircle size={30}/><p>오늘의 첫 인사를 남겨보세요.</p><span>함께 보면 더 즐거우니까요.</span></div>}
       {messages.map(m=><article key={m.id} tabIndex={admin?0:undefined} aria-haspopup={admin?'menu':undefined} onContextMenu={event=>{if(!admin)return;event.preventDefault();openMenu(m,event.currentTarget,event.clientX,event.clientY)}} onKeyDown={event=>{if(admin&&(event.key==='ContextMenu'||(event.shiftKey&&event.key==='F10'))){event.preventDefault();const rect=event.currentTarget.getBoundingClientRect();openMenu(m,event.currentTarget,rect.left+12,rect.bottom)}}} className={`message ${m.kind==='announcement'?'announcement':''} ${m.user_id===userId?'own':''}`}><div className="message-line"><strong className="message-nickname" style={{color:nicknameColor(m.user_id,m.nickname_color)}}>{m.kind==='announcement' && <ShieldCheck size={13} aria-label="관리자 공지"/>}{m.nickname}</strong>{' '}<span className="message-content">{m.message}</span>{' '}<time className="message-time" dateTime={m.created_at}>{new Date(m.created_at).toLocaleTimeString('ko-KR',{hour:'2-digit',minute:'2-digit',hour12:false})}</time></div></article>)}

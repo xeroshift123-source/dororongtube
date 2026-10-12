@@ -17,7 +17,7 @@ npm run dev
 
 ## Supabase 초기 설정 (수동)
 
-1. Supabase 프로젝트를 생성합니다. SQL Editor에서 `supabase/migrations/202610120001_room.sql`, `supabase/migrations/202610120002_profile_settings.sql`, `supabase/migrations/202610120003_chat_cooldown.sql`, `supabase/migrations/202610120004_disable_room_throttle.sql`을 순서대로 각각 한 번 실행합니다. 기존 DB를 변경할 경우 먼저 스테이징에서 검증합니다.
+1. Supabase 프로젝트를 생성합니다. SQL Editor에서 `supabase/migrations/202610120001_room.sql`, `supabase/migrations/202610120002_profile_settings.sql`, `supabase/migrations/202610120003_chat_cooldown.sql`, `supabase/migrations/202610120004_disable_room_throttle.sql`, `supabase/migrations/202610120005_clear_chat.sql`을 순서대로 각각 한 번 실행합니다. 기존 DB를 변경할 경우 먼저 스테이징에서 검증합니다.
 2. Authentication 설정에서 **Anonymous Sign-Ins**를 활성화합니다. 이메일/비밀번호 로그인은 운영자용으로 사용합니다. 일반 사용자 이메일 가입은 운영상 필요하지 않으면 비활성화합니다.
 3. Realtime Settings에서 **Allow public access를 끕니다.** 모든 채널이 private이며, 브라우저의 Broadcast 전송 권한은 없습니다. SQL 정책을 적용한 뒤 실제 두 브라우저에서 채팅과 Presence를 확인합니다.
 4. Authentication의 Users에서 운영자 이메일 계정을 생성·확인하고, 그 **실제 UUID**를 SQL Editor에서 다음 문장에 넣습니다. 임의 UUID로 대체하지 않습니다.
@@ -87,3 +87,5 @@ npm run build
 5. `/`, `/admin`, 모바일 화면, 두 계정 채팅, 운영자 방송 변경, 일반 사용자 RPC 거부, 재연결을 확인합니다. YouTube에 Referer가 전달되어야 하므로 전역 `no-referrer` 설정을 추가하지 않습니다.
 
 배포 환경에는 로컬 환경 변수 파일이 자동 전달되지 않습니다. Vercel 프로젝트에 공개 Supabase URL과 키를 별도로 등록합니다.
+
+관리자는 채팅창 상단의 전체 삭제 버튼으로 확인 후 모든 채팅 기록을 삭제할 수 있습니다. 기존 DB에는 `202610120005_clear_chat.sql`을 추가 실행합니다. 서버에서 관리자 권한을 검사하고 reset 이벤트 하나로 접속자 기록을 갱신합니다. 삭제는 복구할 수 없습니다.
