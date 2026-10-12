@@ -20,6 +20,7 @@ await pg.exec(await readFile(new URL('../supabase/migrations/202610120002_profil
 await pg.exec(await readFile(new URL('../supabase/migrations/202610120003_chat_cooldown.sql',import.meta.url),'utf8'))
 await pg.exec(await readFile(new URL('../supabase/migrations/202610120004_disable_room_throttle.sql',import.meta.url),'utf8'))
 await pg.exec(await readFile(new URL('../supabase/migrations/202610120005_clear_chat.sql',import.meta.url),'utf8'))
+await pg.exec(await readFile(new URL('../supabase/migrations/202610120006_clear_chat_where.sql',import.meta.url),'utf8'))
 const a='11111111-1111-4111-8111-111111111111',b='22222222-2222-4222-8222-222222222222',admin='33333333-3333-4333-8333-333333333333'
 await pg.query('insert into auth.users values ($1),($2),($3)',[a,b,admin])
 await pg.query('insert into public.admin_users(user_id) values($1)',[admin])
