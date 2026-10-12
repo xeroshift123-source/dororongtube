@@ -17,7 +17,7 @@ npm run dev
 
 ## Supabase 초기 설정 (수동)
 
-1. Supabase 프로젝트를 생성합니다. SQL Editor에서 `supabase/migrations/202610120001_room.sql`, `supabase/migrations/202610120002_profile_settings.sql`, `supabase/migrations/202610120003_chat_cooldown.sql`을 순서대로 각각 한 번 실행합니다. 기존 DB를 변경할 경우 먼저 스테이징에서 검증합니다.
+1. Supabase 프로젝트를 생성합니다. SQL Editor에서 `supabase/migrations/202610120001_room.sql`, `supabase/migrations/202610120002_profile_settings.sql`, `supabase/migrations/202610120003_chat_cooldown.sql`, `supabase/migrations/202610120004_disable_room_throttle.sql`을 순서대로 각각 한 번 실행합니다. 기존 DB를 변경할 경우 먼저 스테이징에서 검증합니다.
 2. Authentication 설정에서 **Anonymous Sign-Ins**를 활성화합니다. 이메일/비밀번호 로그인은 운영자용으로 사용합니다. 일반 사용자 이메일 가입은 운영상 필요하지 않으면 비활성화합니다.
 3. Realtime Settings에서 **Allow public access를 끕니다.** 모든 채널이 private이며, 브라우저의 Broadcast 전송 권한은 없습니다. SQL 정책을 적용한 뒤 실제 두 브라우저에서 채팅과 Presence를 확인합니다.
 4. Authentication의 Users에서 운영자 이메일 계정을 생성·확인하고, 그 **실제 UUID**를 SQL Editor에서 다음 문장에 넣습니다. 임의 UUID로 대체하지 않습니다.
@@ -35,7 +35,7 @@ npm run dev
 
 이미 첫 번째 SQL을 적용한 프로젝트는 **202610120002_profile_settings.sql만** SQL Editor에서 실행하면 내 설정 저장 기능이 활성화됩니다. 우측 상단의 닉네임·톱니바퀴 버튼에서 이름과 8가지 색상을 선택합니다. 변경은 이후 보내는 채팅부터 적용되며 이전 메시지는 당시 이름과 색상을 유지합니다. 닉네임 중복·예약어 검사는 유지되고 변경 간격은 5초입니다.
 
-채팅 전송 성공 후 3초 동안 전송 버튼에 남은 시간이 표시됩니다. 기존 프로젝트는 `202610120003_chat_cooldown.sql`을 추가 실행하여 서버의 개인별 제한도 3초로 맞춥니다. 방 전체 500ms 제한은 유지합니다.
+채팅 전송 성공 후 3초 동안 전송 버튼에 남은 시간이 표시됩니다. 기존 프로젝트는 `202610120003_chat_cooldown.sql`을 추가 실행하여 서버의 개인별 제한도 3초로 맞춥니다. 방 전체 제한은 `202610120004_disable_room_throttle.sql`을 실행해 해제합니다. 개인별 3초 제한은 유지합니다.
 
 ## 핵심 설계
 

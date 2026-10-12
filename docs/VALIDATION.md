@@ -6,7 +6,7 @@
 | --- | --- | --- |
 | `npm run lint` | 통과 | ESLint, React Hooks, TypeScript 규칙 |
 | `npm test` | 43개 통과 | URL, revision, 200개 입력 축소·중복 처리, IFrame 60/120/180분, ENDED, 버퍼링, 복구 상한, 자동재생, XSS, 재전송 UUID, 연속 Enter 전송·버튼 전송 후 포커스, Realtime 재구독·gap·네트워크·Presence, 프로필 설정·미리보기·저장 오류·색상 표시, 관리자 우클릭 메뉴·키보드 조작·일반 사용자 비노출, 3초 카운트다운·Enter 제한·입력 유지, 시청자 목록·탭 중복 제거·닉네임 갱신 |
-| `npm run test:db` | 15개 검사 통과 | PGlite에서 SQL 마이그레이션, RLS/권한, 닉네임, 전송 제한·중복, mute, 관리자 revision, private 이벤트 생성, 최근 100개, 정리, 본인 프로필 변경·중복·색상·변경 간격·메시지 스냅샷, 서버 3초 제한·동일 UUID 재전송 |
+| `npm run test:db` | 16개 검사 통과 | PGlite에서 SQL 마이그레이션, RLS/권한, 닉네임, 전송 제한·중복, mute, 관리자 revision, private 이벤트 생성, 최근 100개, 정리, 본인 프로필 변경·중복·색상·변경 간격·메시지 스냅샷, 서버 3초 제한·동일 UUID 재전송·다른 사용자 연속 전송 허용 |
 | `npm run build` | 통과 | TypeScript + Vite 프로덕션 번들 |
 | 브라우저 기본 화면 | 확인 | 키 미설정 안내 렌더링 |
 | UI fixture | 확인 | 실제 컴포넌트의 샘플 채팅·대기 플레이어, 데스크톱과 390×844 viewport, 가로 넘침 없음 |
