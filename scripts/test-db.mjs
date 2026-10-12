@@ -1,0 +1,127 @@
+// Isolated PostgreSQL engine. Auth/Realtime interfaces are stubbed; SQL permissions are real.
+import { PGlite } from '@electric-sql/pglite'
+import { readFile } from 'node:fs/promises'
+import assert from 'node:assert/strict'
+const pg=new PGlite()
+await pg.exec(`create role anon; create role authenticated;
+  create schema auth; create schema realtime;
+  create table auth.users(id uuid primary key);
+  create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;
+  create function auth.jwt() returns jsonb language sql stable as $$ select coalesce(nullif(current_setting('request.jwt.claims',true),''),'{}')::jsonb $$;
+  create table realtime.messages(extension text);
+  alter table realtime.messages enable row level security;
+  create function realtime.topic() returns text language sql stable as $$ select current_setting('test.topic',true) $$;
+  create table realtime.sent(payload jsonb,event text,topic text,private boolean);
+  create function realtime.send(jsonb,text,text,boolean) returns void language sql as $$ insert into realtime.sent values($1,$2,$3,$4) $$;
+  grant usage on schema auth,realtime,public to authenticated,anon;
+  grant select,insert on realtime.messages to authenticated;`)
+await pg.exec(await readFile(new URL('../supabase/migrations/202610120001_room.sql',import.meta.url),'utf8'))
+await pg.exec(await readFile(new URL('../supabase/migrations/202610120002_profile_settings.sql',import.meta.url),'utf8'))
+await pg.exec(await readFile(new URL('../supabase/migrations/202610120003_chat_cooldown.sql',import.meta.url),'utf8'))
+const a='11111111-1111-4111-8111-111111111111',b='22222222-2222-4222-8222-222222222222',admin='33333333-3333-4333-8333-333333333333'
+await pg.query('insert into auth.users values ($1),($2),($3)',[a,b,admin])
+await pg.query('insert into public.admin_users(user_id) values($1)',[admin])
+async function asUser(id,anonymous=true){await pg.exec('reset role');await pg.query("select set_config('request.jwt.claim.sub',$1,false), set_config('request.jwt.claims',$2,false)",[id,JSON.stringify({is_anonymous:anonymous})]);await pg.exec('set role authenticated')}
+async function fails(sql,args=[]){await assert.rejects(()=>pg.query(sql,args))}
+let n=0
+function pass(name){console.log(`PASS ${++n}: ${name}`)}
+await asUser(a)
+await pg.query("select public.join_room('첫시청자')")
+await pg.query("select public.join_room('다른이름')")
+assert.equal((await pg.query('select nickname from public.user_profiles')).rows[0].nickname,'첫시청자');pass('nickname immutable, profile bound to auth UID')
+await fails("insert into public.admin_users(user_id) values($1)",[a])
+await fails("update public.broadcast_state set status='ended'")
+await fails("select public.set_broadcast('abcdefghijk','test','live',0)")
+await fails("select public.delete_message('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa')")
+await fails('select public.mute_user($1,10)',[b])
+await fails('select public.cleanup_chat()');pass('viewer cannot write tables or run admin/cleanup commands')
+await fails("select public.send_message('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','hi','announcement')")
+await fails("select public.send_message('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','   ')")
+await fails("select public.send_message('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',repeat('a',501))");pass('server validates body and announcement privilege')
+await pg.query("select public.send_message('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','hello')")
+await pg.query("select public.send_message('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','hello')")
+await fails("select public.send_message('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','too fast')")
+assert.equal((await pg.query('select public.get_chat_snapshot() as data')).rows[0].data.messages.length,1);pass('idempotent retry and server per-user rate limit')
+await asUser(b)
+await fails("select public.join_room('첫시청자')")
+await fails("select public.join_room('관리자')")
+await pg.query("select public.join_room('둘째시청자')")
+await fails("select public.send_message('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa','stolen')")
+assert.equal((await pg.query('select * from public.user_profiles')).rows.length,1);pass('unique nickname, UUID ownership, private profiles')
+await pg.query("select set_config('test.topic','room:chat',false)")
+await fails("insert into realtime.messages(extension) values('broadcast')")
+await pg.query("select set_config('test.topic','room:presence',false)")
+await pg.query("insert into realtime.messages(extension) values('presence')");pass('trusted Broadcast cannot be forged; Presence allowed')
+await asUser(admin,true)
+assert.equal((await pg.query('select public.is_admin() as ok')).rows[0].ok,false);pass('anonymous JWT never becomes administrator')
+await asUser(admin,false)
+await pg.query("select public.join_room('방송지기')")
+await pg.query("select public.set_broadcast('abcdefghijk','라이브','live',0)")
+await fails("select public.set_broadcast('abcdefghijk','stale','ended',0)")
+assert.equal((await pg.query('select status,revision from public.broadcast_state')).rows[0].status,'live');pass('administrator update uses optimistic revision locking')
+await pg.query('select public.mute_user($1,10)',[b])
+await asUser(b)
+await fails("select public.send_message('bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb','muted')");pass('mute enforced in server function')
+await asUser(admin,false)
+await pg.query("select public.delete_message('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa')")
+const snapshot=(await pg.query('select public.get_chat_snapshot() as data')).rows[0].data
+assert.equal(snapshot.messages.length,0);assert.equal(snapshot.revision,2)
+await pg.exec('reset role')
+const events=(await pg.query('select * from realtime.sent')).rows
+assert.equal(events.length,3);assert.ok(events.every(e=>e.private));pass('committed insertion/state/deletion create private server events and durable revisions')
+// Bulk seed without triggers to verify bounded reads, then retention reset behavior.
+await pg.exec('alter table public.chat_messages disable trigger chat_broadcast')
+for(let i=0;i<105;i++) await pg.query("insert into public.chat_messages(id,user_id,nickname,message,created_at) values($1,$2,'seed','message',now()-interval '8 days')",[`00000000-0000-4000-8000-${String(i).padStart(12,'0')}`,a])
+await pg.exec('alter table public.chat_messages enable trigger chat_broadcast')
+await asUser(a)
+assert.equal((await pg.query('select public.get_chat_snapshot() as data')).rows[0].data.messages.length,100)
+await pg.exec('reset role')
+await pg.query('select public.cleanup_chat()')
+assert.equal((await pg.query('select count(*)::int as n from public.chat_messages')).rows[0].n,0)
+assert.equal((await pg.query("select count(*)::int as n from realtime.sent where event='reset'")).rows[0].n,1);pass('snapshot bounded to 100 and retention emits one reset')
+await asUser(a)
+await pg.query("select public.update_my_profile('새닉네임','#75d5ce')")
+const profile=(await pg.query('select nickname,nickname_color from public.user_profiles')).rows[0]
+assert.deepEqual(profile,{nickname:'새닉네임',nickname_color:'#75d5ce'})
+await fails("select public.update_my_profile('다시변경','#f28da8')")
+await fails("select public.update_my_profile('관리자','#75d5ce')")
+await fails("select public.update_my_profile('새닉네임','red')")
+await fails("select public.update_my_profile('새닉네임',null)")
+await fails("update public.user_profiles set nickname='bypass'")
+pass('own profile settings persisted, validated, throttled; direct updates denied')
+await asUser(b)
+await fails("select public.update_my_profile('새닉네임','#75d5ce')")
+await pg.query("select public.update_my_profile('둘째변경','#f28da8')")
+assert.equal((await pg.query('select nickname from public.user_profiles')).rows[0].nickname,'둘째변경')
+await asUser(a)
+assert.equal((await pg.query('select nickname from public.user_profiles')).rows[0].nickname,'새닉네임')
+pass('duplicate nickname rejected, settings cannot change another UID')
+await pg.exec('reset role')
+await pg.exec("update public.user_profiles set last_message_at='-infinity';update public.room_clock set last_message_at='-infinity'")
+await asUser(a)
+const styled=(await pg.query("select to_jsonb(public.send_message('cccccccc-cccc-4ccc-8ccc-cccccccccccc','styled')) as message")).rows[0].message
+assert.equal(styled.nickname,'새닉네임');assert.equal(styled.nickname_color,'#75d5ce')
+const saved=(await pg.query('select public.get_chat_snapshot() as data')).rows[0].data.messages[0]
+assert.equal(saved.nickname_color,'#75d5ce')
+await pg.exec('reset role')
+const delivered=(await pg.query("select payload from realtime.sent where payload->'message'->>'id'='cccccccc-cccc-4ccc-8ccc-cccccccccccc'")).rows[0].payload.message
+assert.equal(delivered.nickname_color,'#75d5ce')
+await asUser(a)
+await pg.query("select public.update_my_profile('새닉네임','#75d5ce')")
+await pg.exec('reset role')
+await pg.query("select set_config('request.jwt.claim.sub','',false)")
+await pg.exec('set role anon')
+await fails("select public.update_my_profile('unauthorized','#75d5ce')")
+pass('new message, snapshot and Broadcast carry server-owned style; anon cannot update')
+await pg.exec('reset role')
+await pg.exec("update public.user_profiles set last_message_at=clock_timestamp()-interval '2.5 seconds';update public.room_clock set last_message_at='-infinity'")
+await asUser(a)
+await fails("select public.send_message('dddddddd-dddd-4ddd-8ddd-dddddddddddd','still cooling down')")
+await pg.exec('reset role')
+await pg.exec("update public.user_profiles set last_message_at=clock_timestamp()-interval '3.1 seconds'")
+await asUser(a)
+await pg.query("select public.send_message('dddddddd-dddd-4ddd-8ddd-dddddddddddd','cooldown finished')")
+await pg.query("select public.send_message('dddddddd-dddd-4ddd-8ddd-dddddddddddd','cooldown finished')")
+pass('personal three-second cooldown enforced; retry of saved UUID remains idempotent')
+await pg.close()
+console.log(`${n} database checks passed (local engine; hosted Realtime still needs integration QA).`)

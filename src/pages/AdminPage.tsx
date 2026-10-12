@@ -1,0 +1,17 @@
+import { useState } from 'react'
+import { db, rpc } from '../services/supabase'
+import { errorText, parseVideoId } from '../utils/room'
+import type { BroadcastState } from '../types'
+export function AdminPage({admin,state,refresh}:{admin:boolean;state:BroadcastState|null;refresh:()=>void}) {
+  const [email,setEmail]=useState(''),[password,setPassword]=useState(''),[url,setUrl]=useState(''),[title,setTitle]=useState(''),[notice,setNotice]=useState('')
+  const [busy,setBusy]=useState(false),[feedback,setFeedback]=useState('')
+  async function run(action:()=>Promise<unknown>) {setBusy(true);setFeedback('');try{await action();setFeedback('완료했습니다.');refresh()}catch(e){setFeedback(errorText(e))}finally{setBusy(false)}}
+  async function change(status:BroadcastState['status']) {
+    if(!state) throw new Error('방송 상태를 먼저 불러와 주세요.')
+    const id=url.trim()?parseVideoId(url):state.youtube_video_id
+    if(url.trim()&&!id) throw new Error('올바른 YouTube URL 또는 Video ID를 입력해 주세요.')
+    if(status==='live'&&!id) throw new Error('방송 URL이 필요합니다.')
+    await rpc('set_broadcast',{p_video_id:id,p_title:title.trim()||state.title,p_status:status,p_expected_revision:state.revision})
+  }
+  return <section className="admin-card"><div className="eyebrow">ROOM CONTROL</div><h2>방송 관리</h2>{!admin?<form onSubmit={e=>{e.preventDefault();void run(async()=>{const {error}=await db().auth.signInWithPassword({email,password});setPassword('');if(error)throw error})}}><p className="muted">등록된 운영자 계정으로 로그인해 주세요.</p><label htmlFor="admin-email">이메일</label><input id="admin-email" type="email" value={email} onChange={e=>setEmail(e.target.value)} autoComplete="username" required/><label htmlFor="admin-password">비밀번호</label><input id="admin-password" type="password" value={password} onChange={e=>setPassword(e.target.value)} autoComplete="current-password" required/><button className="primary" disabled={busy}>관리자 로그인</button><p className="hint">로그인 후 권한이 표시되지 않으면 관리자 등록을 확인해 주세요.</p></form>:<><p className="muted">현재 방송: {state?.title??'불러오는 중'} · revision {state?.revision??'—'}</p><form onSubmit={e=>{e.preventDefault();void run(()=>change('live'))}}><label htmlFor="video-url">YouTube 라이브 URL / Video ID</label><input id="video-url" value={url} onChange={e=>setUrl(e.target.value)} placeholder={state?.youtube_video_id??'https://www.youtube.com/live/…'}/><label htmlFor="broadcast-title">방송 제목</label><input id="broadcast-title" maxLength={120} value={title} onChange={e=>setTitle(e.target.value)} placeholder={state?.title??'방송 제목'}/><div className="admin-actions"><button className="primary" disabled={busy||!state}>방송 시작 / 변경</button><button type="button" disabled={busy||!state} onClick={()=>void run(()=>change('waiting'))}>대기 전환</button><button type="button" className="danger" disabled={busy||!state} onClick={()=>void run(()=>change('ended'))}>방송 종료</button></div></form><form onSubmit={e=>{e.preventDefault();const id=crypto.randomUUID();void run(async()=>{await rpc('send_message',{p_id:id,p_message:notice,p_kind:'announcement'});setNotice('')})}}><label htmlFor="announcement">전체 공지</label><textarea id="announcement" maxLength={500} value={notice} onChange={e=>setNotice(e.target.value)} required/><button disabled={busy||!notice.trim()}>공지 전송</button></form><p className="hint">공지 전송은 닉네임 입장 후 가능합니다. 채팅 삭제·제한·해제는 시청방의 각 메시지에서 할 수 있습니다.</p><button onClick={()=>void run(async()=>{await db().auth.signOut();window.location.assign('/')})}>로그아웃</button></>}{feedback&&<p role="status" className="feedback">{feedback}</p>}</section>
+}

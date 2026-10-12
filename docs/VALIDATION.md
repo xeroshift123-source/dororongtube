@@ -1,0 +1,31 @@
+# 구현 검증 기록
+
+검증일: 2026-10-12. 외부 Supabase 프로젝트나 YouTube 실방송에 연결하지 않은 로컬 결과입니다.
+
+| 항목 | 결과 | 범위 |
+| --- | --- | --- |
+| `npm run lint` | 통과 | ESLint, React Hooks, TypeScript 규칙 |
+| `npm test` | 43개 통과 | URL, revision, 200개 입력 축소·중복 처리, IFrame 60/120/180분, ENDED, 버퍼링, 복구 상한, 자동재생, XSS, 재전송 UUID, 연속 Enter 전송·버튼 전송 후 포커스, Realtime 재구독·gap·네트워크·Presence, 프로필 설정·미리보기·저장 오류·색상 표시, 관리자 우클릭 메뉴·키보드 조작·일반 사용자 비노출, 3초 카운트다운·Enter 제한·입력 유지, 시청자 목록·탭 중복 제거·닉네임 갱신 |
+| `npm run test:db` | 15개 검사 통과 | PGlite에서 SQL 마이그레이션, RLS/권한, 닉네임, 전송 제한·중복, mute, 관리자 revision, private 이벤트 생성, 최근 100개, 정리, 본인 프로필 변경·중복·색상·변경 간격·메시지 스냅샷, 서버 3초 제한·동일 UUID 재전송 |
+| `npm run build` | 통과 | TypeScript + Vite 프로덕션 번들 |
+| 브라우저 기본 화면 | 확인 | 키 미설정 안내 렌더링 |
+| UI fixture | 확인 | 실제 컴포넌트의 샘플 채팅·대기 플레이어, 데스크톱과 390×844 viewport, 가로 넘침 없음 |
+
+Windows 샌드박스에서 Vite/Vitest의 `realpath`가 EPERM으로 실패하여 승인된 환경에서 재실행했습니다. 테스트 실패 하나는 동일 접근성 이름을 가진 요소를 모호하게 선택한 테스트 쿼리였으며 textbox 역할로 한정하여 수정했습니다.
+
+## 실제 서비스에서 아직 확인하지 않은 사항
+
+- Supabase Dashboard에 마이그레이션 적용 및 실제 Auth/CAPTCHA 설정
+- 실제 private Broadcast 전달, JWT 갱신, 네트워크 단절·재연결, 서버 전송 제한의 동시 요청 부하
+- 200개 실제 소켓의 Presence 수렴·퇴장, 요금제 처리량과 지연
+- 실제 YouTube 라이브의 3시간 연속 재생과 최신 라이브 시점 복귀
+- Android/iOS 실기기 자동재생·키보드·Safari 정책
+- Vercel 실제 배포 및 도메인 Referer/임베드 정책
+
+프런트엔드 재연결 테스트는 Supabase SDK 인터페이스를 모킹하며, DB 검사의 Auth/Realtime 함수도 stub입니다. SQL 보안 규칙과 클라이언트 상태 처리에 대한 증거이며 호스팅 서비스의 동작을 보증하지 않습니다.
+
+`tests/ui-preview.html`은 개발 서버에서만 사용하는 명시적 샘플 화면입니다. `http://127.0.0.1:5173/tests/ui-preview.html`로 확인할 수 있고, Vite 프로덕션 빌드 진입점에 포함하지 않았습니다. 전송은 비활성입니다. 운영자 UI와 실제 라이브 플레이어의 브라우저 검증은 계정/방송 연결 후 진행해야 합니다.
+
+출시 전 검증 절차와 부하 도구 실행 방법은 [OPERATIONS.md](./OPERATIONS.md)에 있습니다.
+
+시청자 목록 추가: 실접속 닉네임 표시 확인. 1920×900 및 390×844에서 시청자 버튼과 채팅창의 오른쪽 좌표 일치, 목록 가로 넘침 없음 확인. Presence 정보는 클라이언트 표시용이며 권한 판단에 사용하지 않습니다.
