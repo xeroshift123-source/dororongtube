@@ -5,6 +5,7 @@ export function useYouTubePlayer(videoId: string | null, revision: number) {
   const container = useRef<HTMLDivElement>(null)
   const player = useRef<YT.Player | null>(null)
   const attempts = useRef(0)
+  const sound = useRef<{muted:boolean;volume:number} | null>(null)
   const [generation,setGeneration] = useState(0)
   const [status,setStatus] = useState('플레이어 준비 중')
   const [needsPlay,setNeedsPlay] = useState(false)
@@ -13,7 +14,14 @@ export function useYouTubePlayer(videoId: string | null, revision: number) {
   const reload = useCallback(() => { attempts.current=0; setGeneration(v=>v+1) },[])
   useEffect(() => {
     if (!videoId || !container.current) return
-    let active=true, retry: number | undefined, watchdog: number | undefined
+    let active=true, ready=false, retry: number | undefined, watchdog: number | undefined
+    const rememberSound = () => {
+      if(!ready||!player.current)return
+      const volume=player.current.getVolume()
+      if(Number.isFinite(volume))sound.current={muted:player.current.isMuted(),volume}
+    }
+    // Native YouTube controls do not emit an API volume-change event.
+    const soundTimer=window.setInterval(rememberSound,1000)
     const clearRecovery = () => { clearTimeout(retry); clearTimeout(watchdog); retry=undefined; watchdog=undefined }
     const recover = () => {
       if (!active || retry !== undefined || !navigator.onLine) return
@@ -30,9 +38,16 @@ export function useYouTubePlayer(videoId: string | null, revision: number) {
       player.current = new api.Player(target, {
         videoId, width:'100%',height:'100%',
         // Quality selection is supported through YouTube's built-in settings menu only.
-        playerVars:{autoplay:1,mute:1,controls:1,disablekb:0,playsinline:1,rel:0,fs:1,origin:window.location.origin},
+        playerVars:{autoplay:1,mute:sound.current?.muted===false?0:1,controls:1,disablekb:0,playsinline:1,rel:0,fs:1,origin:window.location.origin},
         events: {
-          onReady: event => { if (!active) return; event.target.mute(); event.target.playVideo(); setStatus('라이브 연결 중'); watchdog=window.setTimeout(recover,20000) },
+          onReady: event => {
+            if (!active) return
+            if(sound.current)event.target.setVolume(sound.current.volume)
+            if(sound.current?.muted===false)event.target.unMute();else event.target.mute()
+            ready=true
+            if(!sound.current)sound.current={muted:true,volume:event.target.getVolume()}
+            event.target.playVideo(); setStatus('라이브 연결 중'); watchdog=window.setTimeout(recover,20000)
+          },
           onStateChange: event => {
             if (!active) return
             clearRecovery()
@@ -50,11 +65,12 @@ export function useYouTubePlayer(videoId: string | null, revision: number) {
         }
       })
     }).catch(e => { if (active) { setError(errorText(e)); recover() } })
-    const online=()=>recover()
+    const recoverIfStopped=()=>{if(!ready||player.current?.getPlayerState()!==1)recover()}
+    const online=()=>recoverIfStopped()
     let hiddenAt=0
-    const visible=()=>{ if (document.visibilityState==='hidden') hiddenAt=Date.now(); else if (hiddenAt && Date.now()-hiddenAt>60000) { hiddenAt=0; recover() } }
+    const visible=()=>{ if (document.visibilityState==='hidden') hiddenAt=Date.now(); else if (hiddenAt && Date.now()-hiddenAt>60000) { hiddenAt=0; recoverIfStopped() } }
     window.addEventListener('online',online); document.addEventListener('visibilitychange',visible)
-    return ()=> { active=false; clearRecovery(); player.current?.destroy(); player.current=null; window.removeEventListener('online',online); document.removeEventListener('visibilitychange',visible) }
+    return ()=> { rememberSound(); active=false; clearInterval(soundTimer); clearRecovery(); player.current?.destroy(); player.current=null; window.removeEventListener('online',online); document.removeEventListener('visibilitychange',visible) }
   },[videoId,revision,generation])
   const play = () => { player.current?.playVideo(); setNeedsPlay(false) }
   return {container,status,error,needsPlay,reload,play}
