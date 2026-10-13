@@ -1,10 +1,29 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, expect, it, vi } from 'vitest'
 import { ViewerList } from '../src/components/common/ViewerList'
 import { presenceViewers } from '../src/utils/presence'
 const rpc=vi.hoisted(()=>vi.fn().mockResolvedValue('슈엔의노예0123'))
 vi.mock('../src/services/supabase',()=>({rpc}))
-afterEach(()=>{cleanup();rpc.mockClear()})
+afterEach(()=>{cleanup();rpc.mockClear();vi.useRealTimers()})
+it('dims muted users, keeps moderation available and restores them on expiry or early unmute',()=>{
+  vi.useFakeTimers();vi.setSystemTime(new Date('2026-10-13T12:00:00Z'))
+  const people=[{id:'other',nickname:'정지사용자',color:'#75d5ce',muted_until:'2026-10-13T12:10:00Z'}]
+  const {rerender}=render(<ViewerList participants={people} status="connected" admin/>)
+  fireEvent.click(screen.getByRole('button',{name:'함께 시청 중인 인원 목록'}))
+  const row=screen.getByText('정지사용자').closest('li')!
+  expect(row.classList.contains('viewer-muted')).toBe(true)
+  expect(screen.getByText('채팅 정지')).toBeTruthy()
+  fireEvent.contextMenu(row)
+  expect(screen.getByRole('menuitem',{name:'채팅 제한 해제'})).toBeTruthy()
+  fireEvent.keyDown(document,{key:'Escape'})
+  act(()=>vi.advanceTimersByTime(600000))
+  expect(row.classList.contains('viewer-muted')).toBe(false)
+  expect(screen.queryByText('채팅 정지')).toBeNull()
+  rerender(<ViewerList participants={[{...people[0],muted_until:'2026-10-13T12:20:00Z'}]} status="connected" admin/>)
+  expect(row.classList.contains('viewer-muted')).toBe(true)
+  rerender(<ViewerList participants={[{...people[0],muted_until:null}]} status="connected" admin/>)
+  expect(row.classList.contains('viewer-muted')).toBe(false)
+})
 it('deduplicates tabs and uses the latest available nickname and safe color',()=>{
   const people=presenceViewers({u:[{nickname:'이전',profile_at:1},{nickname:'새닉네임',color:'#75d5ce',profile_at:2}],v:[{}],gone:[]})
   expect(people).toHaveLength(2)

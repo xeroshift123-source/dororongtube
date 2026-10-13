@@ -8,6 +8,13 @@ import { errorText } from '../../utils/room'
 
 export function ViewerList({participants,status,userId,admin=false,refresh}:{participants:Viewer[];status:ConnectionStatus;userId?:string;admin?:boolean;refresh?:()=>void}) {
   const [open,setOpen]=useState(false)
+  const [now,setNow]=useState(Date.now)
+  useEffect(()=>{
+    if(!open)return
+    setNow(Date.now())
+    const timer=window.setInterval(()=>setNow(Date.now()),1000)
+    return()=>window.clearInterval(timer)
+  },[open])
   const [menu,setMenu]=useState<{person:Viewer;x:number;y:number}|null>(null)
   const [error,setError]=useState(''),[feedback,setFeedback]=useState('')
   const origin=useRef<HTMLElement|null>(null)
@@ -26,7 +33,7 @@ export function ViewerList({participants,status,userId,admin=false,refresh}:{par
   return <div className="viewer-list-wrap" ref={root}>
     <button className="viewer-chip" ref={trigger} aria-expanded={open} aria-controls="viewer-list" aria-label="함께 시청 중인 인원 목록" onClick={()=>setOpen(!open)}><Users size={17}/><strong>{status==='connected'?participants.length:'—'}</strong><span>함께 시청 중</span></button>
     {open&&<section id="viewer-list" className="viewer-popover" aria-label="현재 시청자"><div className="viewer-list-heading"><h2>함께 시청 중 {status==='connected'?`(${participants.length})`:''}</h2><button aria-label="시청자 목록 닫기" onClick={()=>{setOpen(false);trigger.current?.focus()}}><X size={16}/></button></div>
-      {status!=='connected'?<p className="viewer-list-empty">연결되면 현재 인원을 확인할 수 있어요.</p>:participants.length===0?<p className="viewer-list-empty">접속 인원을 확인하고 있어요.</p>:<ul>{participants.map(person=><li key={person.id} tabIndex={admin?0:undefined} aria-haspopup={admin?'menu':undefined} onContextMenu={event=>{if(!admin)return;event.preventDefault();openMenu(person,event.currentTarget,event.clientX,event.clientY)}} onKeyDown={event=>{if(admin&&(event.key==='ContextMenu'||(event.shiftKey&&event.key==='F10'))){event.preventDefault();const rect=event.currentTarget.getBoundingClientRect();openMenu(person,event.currentTarget,rect.left+12,rect.bottom)}}}><span className="dot green"/><strong style={{color:person.color}}>{person.nickname}{person.is_admin&&<AdminBadge/>}</strong>{person.id===userId&&<small>나</small>}</li>)}</ul>}
+      {status!=='connected'?<p className="viewer-list-empty">연결되면 현재 인원을 확인할 수 있어요.</p>:participants.length===0?<p className="viewer-list-empty">접속 인원을 확인하고 있어요.</p>:<ul>{participants.map(person=>{const muted=Boolean(person.muted_until&&Date.parse(person.muted_until)>now);return <li key={person.id} className={muted?'viewer-muted':undefined} tabIndex={admin?0:undefined} aria-haspopup={admin?'menu':undefined} onContextMenu={event=>{if(!admin)return;event.preventDefault();openMenu(person,event.currentTarget,event.clientX,event.clientY)}} onKeyDown={event=>{if(admin&&(event.key==='ContextMenu'||(event.shiftKey&&event.key==='F10'))){event.preventDefault();const rect=event.currentTarget.getBoundingClientRect();openMenu(person,event.currentTarget,rect.left+12,rect.bottom)}}}><span className="dot green"/><strong style={{color:person.color}}>{person.nickname}{person.is_admin&&<AdminBadge/>}</strong>{person.id===userId&&<small>나</small>}{muted&&<small>채팅 정지</small>}</li>})}</ul>}
       {error&&<p className="error small" role="alert">{error}</p>}
       {feedback&&<p className="moderation-feedback" role="status">{feedback}</p>}
     </section>}

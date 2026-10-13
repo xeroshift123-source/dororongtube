@@ -73,7 +73,7 @@ export function useRoom(userId?: string, nickname = '', color = '', onProfileCha
       if (result.gap) { pending.push(event); pending=pending.slice(-200); void refresh() }
       else { snapshot=result.state; publish() }
     }).on('broadcast',{event:'reset'},() => void refresh())
-    const stateChannel = client.channel('room:state',{config:{private:true}}).on('broadcast',{event:'change'},() => void refresh()).on('broadcast',{event:'profile_changed'},({payload}) => {if(payload.user_id===userId)profileChanged.current?.();void refresh()})
+    const stateChannel = client.channel('room:state',{config:{private:true}}).on('broadcast',{event:'change'},() => void refresh()).on('broadcast',{event:'profile_changed'},({payload}) => {if(payload.user_id===userId)profileChanged.current?.();void refresh()}).on('broadcast',{event:'moderation_changed'},() => void refreshProfiles())
     const presence = client.channel('room:presence',{config:{private:true,presence:{key:userId}}}).on('presence',{event:'sync'},() => { if (active) {const people=presenceViewers(presence.presenceState());onlinePeople=people;setParticipants(people);setViewers(people.length);void refreshProfiles()} })
     const trackProfile = () => {if(active&&connected.has(presence.topic))void presence.track({online:true,...profile.current,profile_at:Date.now()}).then(result=>{if(active&&result!=='ok')setError('시청 인원 등록에 실패했습니다.')})}
     updatePresence.current=trackProfile
@@ -104,6 +104,6 @@ export function useRoom(userId?: string, nickname = '', color = '', onProfileCha
     }
   },[userId])
   const profilesById=new Map(roomProfiles.map(profile=>[profile.user_id,profile]))
-  const verifiedParticipants=participants.map(person=>{const saved=profilesById.get(person.id);return saved?{...person,nickname:saved.nickname,color:nicknameColor(person.id,saved.nickname_color),is_admin:saved.is_admin}:person})
+  const verifiedParticipants=participants.map(person=>{const saved=profilesById.get(person.id);return saved?{...person,nickname:saved.nickname,color:nicknameColor(person.id,saved.nickname_color),is_admin:saved.is_admin,muted_until:saved.muted_until}:person})
   return {broadcast,messages:chat.messages,viewers,participants:verifiedParticipants,status,error,refresh:() => refreshRef.current()}
 }
