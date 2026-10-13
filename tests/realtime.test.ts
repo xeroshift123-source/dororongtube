@@ -7,7 +7,54 @@ const mock=vi.hoisted(()=>({channels:[] as Channel[],rpc:vi.fn(),single:vi.fn(),
 vi.mock('../src/services/supabase',()=>({rpc:mock.rpc,db:()=>({from:()=>({select:()=>({eq:()=>({single:mock.single})})}),removeChannel:mock.remove,channel:(topic:string)=>{const c:Channel={topic,handlers:{},track:vi.fn().mockResolvedValue('ok'),presenceState:()=>({u:[{},{}],v:[{}]}),on(type,filter,fn){this.handlers[`${type}:${filter.event}`]=fn;return this},subscribe(fn){this.callback=fn;return this}};mock.channels.push(c);return c}})}))
 const state=(revision:number):BroadcastState=>({id:1,youtube_video_id:'abcdefghijk',title:'live',status:'live',started_at:null,updated_at:'',updated_by:null,revision})
 beforeEach(()=>{mock.channels.length=0;mock.rpc.mockReset().mockResolvedValue({revision:0,messages:[]});mock.single.mockReset().mockResolvedValue({data:state(1),error:null});mock.remove.mockReset()})
-afterEach(cleanup)
+afterEach(()=>{cleanup();vi.useRealTimers()})
+it('silently retries a transient presence failure and stops retrying after success',async()=>{
+  vi.useFakeTimers()
+  const {result,unmount}=renderHook(()=>useRoom('u'))
+  await act(async()=>{})
+  const presence=mock.channels[2]
+  presence.track.mockResolvedValueOnce('timed out').mockResolvedValue('ok')
+  await act(async()=>mock.channels.forEach(channel=>channel.callback?.('SUBSCRIBED')))
+  expect(result.current.error).toBe('')
+  await act(async()=>vi.advanceTimersByTime(2000))
+  expect(presence.track).toHaveBeenCalledTimes(2)
+  expect(result.current.error).toBe('')
+  await act(async()=>vi.advanceTimersByTime(30000))
+  expect(presence.track).toHaveBeenCalledTimes(2)
+  unmount();expect(vi.getTimerCount()).toBe(0)
+})
+it('keeps persistent presence errors stable across unrelated successful refreshes',async()=>{
+  vi.useFakeTimers()
+  const {result}=renderHook(()=>useRoom('u'))
+  await act(async()=>{})
+  const presence=mock.channels[2]
+  presence.track.mockResolvedValueOnce('timed out').mockResolvedValueOnce('error').mockRejectedValueOnce(new Error('network')).mockResolvedValue('ok')
+  await act(async()=>mock.channels.forEach(channel=>channel.callback?.('SUBSCRIBED')))
+  await act(async()=>vi.advanceTimersByTime(2000))
+  await act(async()=>vi.advanceTimersByTime(5000))
+  expect(result.current.error).toContain('시청 인원 연결을 복구 중')
+  await act(async()=>mock.channels[1].handlers['broadcast:change']({payload:{}}))
+  expect(result.current.error).toContain('시청 인원 연결을 복구 중')
+  await act(async()=>vi.advanceTimersByTime(10000))
+  expect(result.current.error).toBe('')
+})
+it('serializes profile tracking and ignores results from an old connection',async()=>{
+  vi.useFakeTimers()
+  const {rerender,result}=renderHook(({nickname})=>useRoom('u',nickname),{initialProps:{nickname:'이전'}})
+  await act(async()=>{})
+  const presence=mock.channels[2]
+  let finishOld!:(value:string)=>void
+  presence.track.mockImplementationOnce(()=>new Promise<string>(resolve=>{finishOld=resolve})).mockResolvedValue('ok')
+  await act(async()=>mock.channels.forEach(channel=>channel.callback?.('SUBSCRIBED')))
+  rerender({nickname:'변경'})
+  expect(presence.track).toHaveBeenCalledTimes(1)
+  await act(async()=>{presence.callback?.('CHANNEL_ERROR');presence.callback?.('SUBSCRIBED')})
+  expect(presence.track).toHaveBeenLastCalledWith(expect.objectContaining({nickname:'변경'}))
+  await act(async()=>finishOld('timed out'))
+  await act(async()=>vi.advanceTimersByTime(30000))
+  expect(presence.track).toHaveBeenCalledTimes(2)
+  expect(result.current.error).toBe('')
+})
 it('uses server profiles for viewer names and roles and refreshes the target session after moderation',async()=>{
   const id='11111111-1111-4111-8111-111111111111'
   let nickname='서버닉네임'
