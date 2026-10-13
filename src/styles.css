@@ -1,4 +1,7 @@
 @import "tailwindcss";
+.join-rules { margin: 18px 0 22px; padding: 18px; border: 1px solid #b99bff22; border-radius: 10px; background: #b99bff08; font-size: 13px; line-height: 1.8; color: #c5c3ce; overflow-wrap: anywhere; }
+.join-rules ul { list-style: disc; padding-left: 20px; margin: 14px 0; }
+.join-rules li + li { margin-top: 8px; }
 .viewer-popover li.viewer-muted { opacity: .45; }
 .admin-badge { display: inline-flex; vertical-align: -2px; margin-left: 4px; color: #c1acff; }
 .moderation-feedback { padding: 8px 12px; font-size: 12px; color: #d3bdfc; line-height: 1.5; flex-shrink: 0; }
