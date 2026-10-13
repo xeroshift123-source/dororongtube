@@ -14,7 +14,7 @@ it('limits chat input to 50 characters and rejects oversized submissions',async(
   expect(rpc).not.toHaveBeenCalled()
   expect(screen.getByRole('alert').textContent).toBe('메시지는 1~50자입니다')
   fireEvent.change(input,{target:{value:'가'.repeat(50)}})
-  expect(screen.getByText('50/50 · Shift+Enter 줄바꿈')).toBeTruthy()
+  expect(screen.getByText('50/50')).toBeTruthy()
   await act(async()=>fireEvent.keyDown(input,{key:'Enter'}))
   expect(rpc).toHaveBeenCalledWith('send_message',expect.objectContaining({p_message:'가'.repeat(50)}))
 })

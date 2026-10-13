@@ -3,7 +3,6 @@
 .admin-badge { display: inline-flex; vertical-align: -2px; margin-left: 4px; color: #c1acff; }
 .moderation-feedback { padding: 8px 12px; font-size: 12px; color: #d3bdfc; line-height: 1.5; flex-shrink: 0; }
 .viewer-popover li[aria-haspopup]:focus-visible { outline: 1px solid #c1acff; border-radius: 4px; }
-.player-controls-hint { flex-basis: 100%; line-height: 1.6; }
 .profile-settings-button { max-width: 180px; }
 .profile-button-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .profile-settings-button svg { flex-shrink: 0; }
@@ -114,16 +113,17 @@
   .watch-layout .chat-header { padding: 10px 14px; }
   .watch-layout .chat-guideline { padding: 7px 14px; }
   .watch-layout .message-list { padding: 6px 14px; }
-  .watch-layout .chat-composer { display: grid; grid-template-columns: minmax(0, 1fr) 40px; gap: 6px 8px; padding: 8px 12px; }
-  .watch-layout .composer-identity { grid-column: 1 / -1; margin-bottom: 0; }
-  .watch-layout .chat-composer textarea { display: block; height: 42px; min-height: 42px; padding: 8px 10px; line-height: 24px; }
-  .watch-layout .composer-bottom { display: contents; }
-  .watch-layout .composer-bottom > span { display: none; }
-  .watch-layout .composer-bottom > button { width: 40px; height: 42px; padding: 0; }
-  .watch-layout .chat-composer > .error { grid-column: 1 / -1; }
+  .watch-layout .chat-composer { padding: 8px 12px; }
+  .watch-layout .composer-identity { margin-bottom: 6px; }
   .watch-layout .new-messages { bottom: 86px; }
   .app-shell:has(.watch-layout) > footer { display: none; }
 }
+.chat-composer .composer-input { position: relative; }
+.chat-composer .composer-input textarea { display: block; height: 48px; min-height: 48px; padding: 10px 96px 10px 10px; line-height: 26px; }
+.chat-composer .composer-bottom { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); display: flex; align-items: center; gap: 8px; margin: 0; }
+.chat-composer .composer-bottom > span { display: block; font-size: 10px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.chat-composer .composer-bottom > button { width: 36px; height: 36px; min-width: 36px; min-height: 36px; padding: 0; }
+.chat-panel .new-messages { bottom: 92px; }
 @media (max-height: 600px) and (max-width: 760px), (max-height: 600px) and (max-aspect-ratio: 1/1) {
   .app-shell:has(.watch-layout) .room-toolbar { padding-block: 4px; }
   .watch-layout .player-frame { height: 20dvh; }

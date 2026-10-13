@@ -8,7 +8,7 @@ export function LivePlayer({state}:{state:BroadcastState | null}) {
     <div className="player-frame">
       {live ? <div className="youtube-mount" ref={p.container}/> : <div className="waiting"><div className="waiting-icon"><Radio size={40}/></div><span className="eyebrow">OUR LITTLE WATCH PARTY</span><h2>{state?.status==='ended' ? '다음 라이브에서 만나요' : '함께 볼 준비, 되셨나요?'}</h2><p>{state?.status==='ended' ? '관리자가 방송을 종료했습니다.' : '방송이 시작되면 이곳에서 함께 시청할 수 있어요.'}</p><span className="waiting-label"><span className="dot"/> 방송 대기 중</span></div>}
     </div>
-    {live && <div className="player-tools"><span className="small muted">{p.status}</span><div className="tool-actions">{p.needsPlay && <button onClick={p.play}><Play size={15}/> 재생하기</button>}<button onClick={p.reload}><RotateCw size={15}/> 라이브 다시 연결</button></div><p className="small muted player-controls-hint">화질은 영상의 설정(⚙)에서, 음량은 스피커 메뉴에서 조절할 수 있어요. 모바일에서는 기기 음량 버튼을 이용해 주세요.</p></div>}
+    {live && <div className="player-tools"><span className="small muted">{p.status}</span><div className="tool-actions">{p.needsPlay && <button onClick={p.play}><Play size={15}/> 재생하기</button>}<button onClick={p.reload}><RotateCw size={15}/> 라이브 다시 연결</button></div></div>}
     {live && p.error && <p role="alert" className="error player-error">{p.error}</p>}
   </section>
 }
