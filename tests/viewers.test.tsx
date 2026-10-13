@@ -1,8 +1,10 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { afterEach, expect, it } from 'vitest'
+import { afterEach, expect, it, vi } from 'vitest'
 import { ViewerList } from '../src/components/common/ViewerList'
 import { presenceViewers } from '../src/utils/presence'
-afterEach(cleanup)
+const rpc=vi.hoisted(()=>vi.fn().mockResolvedValue('슈엔의노예0123'))
+vi.mock('../src/services/supabase',()=>({rpc}))
+afterEach(()=>{cleanup();rpc.mockClear()})
 it('deduplicates tabs and uses the latest available nickname and safe color',()=>{
   const people=presenceViewers({u:[{nickname:'이전',profile_at:1},{nickname:'새닉네임',color:'#75d5ce',profile_at:2}],v:[{}],gone:[]})
   expect(people).toHaveLength(2)
@@ -25,4 +27,33 @@ it('does not show stale names while disconnected and closes on outside click',()
   expect(screen.getByText('연결되면 현재 인원을 확인할 수 있어요.')).toBeTruthy()
   fireEvent.pointerDown(document.body)
   expect(screen.queryByRole('region',{name:'현재 시청자'})).toBeNull()
+})
+it('shows verified admin badges and allows right-click rename from the viewer list',async()=>{
+  rpc.mockResolvedValueOnce('슈엔의노예0123')
+  const refresh=vi.fn()
+  render(<ViewerList participants={[{id:'other',nickname:'운영친구',color:'#75d5ce',is_admin:true}]} status="connected" admin refresh={refresh}/>)
+  fireEvent.click(screen.getByRole('button',{name:'함께 시청 중인 인원 목록'}))
+  expect(screen.getByLabelText('관리자')).toBeTruthy()
+  fireEvent.contextMenu(screen.getByText('운영친구'))
+  const rename=screen.getByRole('menuitem',{name:'닉네임 강제 변경'})
+  fireEvent.pointerDown(rename)
+  fireEvent.click(rename)
+  await vi.waitFor(()=>expect(rpc).toHaveBeenCalledWith('force_rename_user',{p_user_id:'other'}))
+  expect(refresh).toHaveBeenCalledOnce()
+  expect((await screen.findByRole('status')).textContent).toContain('슈엔의노예0123')
+  expect(screen.queryByRole('menu')).toBeNull()
+})
+it('supports keyboard user menus and hides them from ordinary viewers',()=>{
+  const people=[{id:'other',nickname:'대상사용자',color:'#75d5ce'}]
+  const {rerender}=render(<ViewerList participants={people} status="connected" admin/>)
+  fireEvent.click(screen.getByRole('button',{name:'함께 시청 중인 인원 목록'}))
+  const row=screen.getByText('대상사용자').closest('li')!
+  row.focus();fireEvent.keyDown(row,{key:'F10',shiftKey:true})
+  expect(screen.getByRole('menuitem',{name:'10분 채팅 제한'})).toBe(document.activeElement)
+  fireEvent.keyDown(document,{key:'Escape'})
+  expect(document.activeElement).toBe(row)
+  expect(screen.getByRole('region',{name:'현재 시청자'})).toBeTruthy()
+  rerender(<ViewerList participants={people} status="connected" admin={false}/>)
+  fireEvent.contextMenu(row)
+  expect(screen.queryByRole('menu')).toBeNull()
 })

@@ -8,6 +8,21 @@ vi.mock('../src/services/supabase',()=>({rpc:mock.rpc,db:()=>({from:()=>({select
 const state=(revision:number):BroadcastState=>({id:1,youtube_video_id:'abcdefghijk',title:'live',status:'live',started_at:null,updated_at:'',updated_by:null,revision})
 beforeEach(()=>{mock.channels.length=0;mock.rpc.mockReset().mockResolvedValue({revision:0,messages:[]});mock.single.mockReset().mockResolvedValue({data:state(1),error:null});mock.remove.mockReset()})
 afterEach(cleanup)
+it('uses server profiles for viewer names and roles and refreshes the target session after moderation',async()=>{
+  const id='11111111-1111-4111-8111-111111111111'
+  let nickname='서버닉네임'
+  mock.rpc.mockImplementation(async(name:string)=>name==='get_room_profiles'?[{user_id:id,nickname,nickname_color:'#75d5ce',is_admin:true}]:{revision:0,messages:[]})
+  const refreshProfile=vi.fn()
+  const {result}=renderHook(()=>useRoom(id,'클라이언트닉네임','#75d5ce',refreshProfile))
+  await waitFor(()=>expect(result.current.broadcast).not.toBeNull())
+  mock.channels[2].presenceState=()=>({[id]:[{nickname:'위조닉네임',is_admin:true}]})
+  act(()=>{mock.channels.forEach(channel=>channel.callback?.('SUBSCRIBED'));mock.channels[2].handlers['presence:sync']({payload:{}})})
+  await waitFor(()=>expect(result.current.participants[0]).toMatchObject({nickname:'서버닉네임',is_admin:true}))
+  nickname='슈엔의노예0123'
+  act(()=>mock.channels[1].handlers['broadcast:profile_changed']({payload:{user_id:id}}))
+  await waitFor(()=>expect(result.current.participants[0].nickname).toBe(nickname))
+  expect(refreshProfile).toHaveBeenCalledOnce()
+})
 it('updates Presence nickname without recreating subscriptions',async()=>{
   const {rerender}=renderHook(({nickname})=>useRoom('u',nickname,'#75d5ce'),{initialProps:{nickname:'처음'}})
   act(()=>mock.channels.forEach(channel=>channel.callback?.('SUBSCRIBED')))

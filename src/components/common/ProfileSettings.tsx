@@ -58,7 +58,7 @@ export function ProfileSettings({ nickname, color, onSave, onClose }: Props) {
         </div>
       </fieldset>
       <div className="profile-preview"><strong style={{ color: selected }}>{name.trim() || '닉네임'}</strong> 함께 시청해요!</div>
-      <p className="hint">변경한 닉네임과 색상은 앞으로 보내는 채팅에 적용돼요.</p>
+      <p className="hint">닉네임은 5분에 한 번 변경할 수 있어요. 변경한 닉네임과 색상은 앞으로 보내는 채팅에 적용돼요.</p>
       {error && <p role="alert" className="error small">{error}</p>}
       <div className="profile-actions"><button type="button" onClick={onClose} disabled={saving}>취소</button><button className="primary" disabled={saving || name.trim().length < 2}>{saving ? '저장 중…' : '저장하기'}</button></div>
     </form>

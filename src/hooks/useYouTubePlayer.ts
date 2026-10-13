@@ -8,7 +8,6 @@ export function useYouTubePlayer(videoId: string | null, revision: number) {
   const [generation,setGeneration] = useState(0)
   const [status,setStatus] = useState('플레이어 준비 중')
   const [needsPlay,setNeedsPlay] = useState(false)
-  const [muted,setMuted] = useState(true)
   const [error,setError] = useState('')
   useEffect(() => { attempts.current=0 },[videoId,revision])
   const reload = useCallback(() => { attempts.current=0; setGeneration(v=>v+1) },[])
@@ -23,14 +22,15 @@ export function useYouTubePlayer(videoId: string | null, revision: number) {
       setStatus(`${Math.round(delay/1000)}초 후 라이브에 다시 연결`)
       retry=window.setTimeout(() => { if (active) setGeneration(v=>v+1) },delay)
     }
-    setStatus('플레이어 준비 중'); setError(''); setNeedsPlay(false); setMuted(true)
+    setStatus('플레이어 준비 중'); setError(''); setNeedsPlay(false)
     // YouTube replaces this child with an iframe. React owns only the outer container.
     const target=document.createElement('div'); container.current.replaceChildren(target)
     void loadYouTube().then(api => {
       if (!active) return
       player.current = new api.Player(target, {
         videoId, width:'100%',height:'100%',
-        playerVars:{autoplay:1,mute:1,controls:0,disablekb:1,playsinline:1,rel:0,fs:1,origin:window.location.origin},
+        // Quality selection is supported through YouTube's built-in settings menu only.
+        playerVars:{autoplay:1,mute:1,controls:1,disablekb:0,playsinline:1,rel:0,fs:1,origin:window.location.origin},
         events: {
           onReady: event => { if (!active) return; event.target.mute(); event.target.playVideo(); setStatus('라이브 연결 중'); watchdog=window.setTimeout(recover,20000) },
           onStateChange: event => {
@@ -57,6 +57,5 @@ export function useYouTubePlayer(videoId: string | null, revision: number) {
     return ()=> { active=false; clearRecovery(); player.current?.destroy(); player.current=null; window.removeEventListener('online',online); document.removeEventListener('visibilitychange',visible) }
   },[videoId,revision,generation])
   const play = () => { player.current?.playVideo(); setNeedsPlay(false) }
-  const toggleSound = () => { if (!player.current) return; if (muted) player.current.unMute(); else player.current.mute(); setMuted(!muted) }
-  return {container,status,error,needsPlay,muted,reload,play,toggleSound}
+  return {container,status,error,needsPlay,reload,play}
 }

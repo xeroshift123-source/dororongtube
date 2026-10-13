@@ -31,6 +31,18 @@ export function useSession() {
     }).catch(e => { if (active) setError(errorText(e)) }).finally(() => { if (active) setLoading(false) })
     return () => { active = false }
   }, [userId,profileRevision]) // Token refresh doesn't reset room membership.
+  const refreshProfile=useCallback(async()=>{
+    if(!userId||!supabase)return
+    const result=await supabase.from('user_profiles').select('*').eq('user_id',userId).maybeSingle()
+    if(!result.error&&result.data){setNickname(result.data.nickname);setColor(result.data.nickname_color??null);sessionStorage.setItem('dororong:nickname',result.data.nickname)}
+  },[userId])
+  useEffect(()=>{
+    if(!userId)return
+    const visible=()=>{if(document.visibilityState==='visible')void refreshProfile()}
+    const poll=window.setInterval(visible,60000)
+    document.addEventListener('visibilitychange',visible)
+    return()=>{clearInterval(poll);document.removeEventListener('visibilitychange',visible)}
+  },[userId,refreshProfile])
   const join = useCallback(async (name: string, captchaToken?: string) => {
     setError(''); setLoading(true)
     try {
@@ -53,5 +65,5 @@ export function useSession() {
       throw e
     }
   },[])
-  return { user, nickname, color:nicknameColor(userId ?? '',color), admin, loading, error, join, updateProfile }
+  return { user, nickname, color:nicknameColor(userId ?? '',color), admin, loading, error, join, updateProfile, refreshProfile }
 }

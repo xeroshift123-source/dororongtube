@@ -1,16 +1,20 @@
 import { useEffect, useRef, useState } from 'react'
 import { db, rpc } from '../services/supabase'
-import type { BroadcastState, ChatEvent, ChatSnapshot, ConnectionStatus, Viewer } from '../types'
+import type { BroadcastState, ChatEvent, ChatSnapshot, ConnectionStatus, RoomProfile, Viewer } from '../types'
 import { applyChatEvent, errorText, latestBroadcast } from '../utils/room'
 import { presenceViewers } from '../utils/presence'
+import { nicknameColor } from '../utils/profile'
 const empty: ChatSnapshot = { revision: 0, messages: [] }
-export function useRoom(userId?: string, nickname = '', color = '') {
+export function useRoom(userId?: string, nickname = '', color = '', onProfileChanged?: () => void) {
   const [broadcast,setBroadcast] = useState<BroadcastState | null>(null)
   const [chat,setChat] = useState<ChatSnapshot>(empty)
   const [viewers,setViewers] = useState(0)
   const [participants,setParticipants] = useState<Viewer[]>([])
+  const [roomProfiles,setRoomProfiles] = useState<RoomProfile[]>([])
   const profile = useRef({nickname,color})
   const updatePresence = useRef<(() => void) | null>(null)
+  const profileChanged = useRef(onProfileChanged)
+  useEffect(()=>{profileChanged.current=onProfileChanged},[onProfileChanged])
   useEffect(()=>{profile.current={nickname,color};updatePresence.current?.()},[nickname,color])
   const [status,setStatus] = useState<ConnectionStatus>('connecting')
   const [error,setError] = useState('')
@@ -22,6 +26,20 @@ export function useRoom(userId?: string, nickname = '', color = '') {
     let pending: ChatEvent[] = []
     const connected = new Set<string>()
     const client = db()
+    let onlinePeople:Viewer[]=[]
+    let profileRequest=0
+    async function refreshProfiles() {
+      const request=++profileRequest
+      const ids=onlinePeople.map(person=>person.id).filter(id=>/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id))
+      if(!ids.length){setRoomProfiles([]);return}
+      try{
+        const batches=[]
+        for(let i=0;i<ids.length;i+=500)batches.push(rpc<RoomProfile[]>('get_room_profiles',{p_user_ids:ids.slice(i,i+500)}))
+        const results=await Promise.all(batches)
+        if(active&&request===profileRequest)setRoomProfiles(results.flat())
+      }catch(e){if(active&&request===profileRequest)setError(errorText(e))}
+    }
+    setRoomProfiles([])
     setChat(empty); setBroadcast(null); setViewers(0); setParticipants([]); setStatus('connecting')
     function publish() { if (active) setChat(snapshot) }
     async function refresh() {
@@ -43,6 +61,7 @@ export function useRoom(userId?: string, nickname = '', color = '') {
         pending = pending.filter(e => e.revision > snapshot.revision)
         publish()
         setBroadcast(old => latestBroadcast(old,state.data as BroadcastState)); setError('')
+        void refreshProfiles()
       } catch(e) { if (active) setError(errorText(e)) }
       finally { fetching = false; if (again && active) { again = false; window.setTimeout(() => void refresh(),1000) } }
     }
@@ -54,8 +73,8 @@ export function useRoom(userId?: string, nickname = '', color = '') {
       if (result.gap) { pending.push(event); pending=pending.slice(-200); void refresh() }
       else { snapshot=result.state; publish() }
     }).on('broadcast',{event:'reset'},() => void refresh())
-    const stateChannel = client.channel('room:state',{config:{private:true}}).on('broadcast',{event:'change'},() => void refresh())
-    const presence = client.channel('room:presence',{config:{private:true,presence:{key:userId}}}).on('presence',{event:'sync'},() => { if (active) {const people=presenceViewers(presence.presenceState());setParticipants(people);setViewers(people.length)} })
+    const stateChannel = client.channel('room:state',{config:{private:true}}).on('broadcast',{event:'change'},() => void refresh()).on('broadcast',{event:'profile_changed'},({payload}) => {if(payload.user_id===userId)profileChanged.current?.();void refresh()})
+    const presence = client.channel('room:presence',{config:{private:true,presence:{key:userId}}}).on('presence',{event:'sync'},() => { if (active) {const people=presenceViewers(presence.presenceState());onlinePeople=people;setParticipants(people);setViewers(people.length);void refreshProfiles()} })
     const trackProfile = () => {if(active&&connected.has(presence.topic))void presence.track({online:true,...profile.current,profile_at:Date.now()}).then(result=>{if(active&&result!=='ok')setError('시청 인원 등록에 실패했습니다.')})}
     updatePresence.current=trackProfile
     const subscriptions = [chatChannel,stateChannel,presence]
@@ -84,5 +103,7 @@ export function useRoom(userId?: string, nickname = '', color = '') {
       subscriptions.forEach(c => { void client.removeChannel(c) })
     }
   },[userId])
-  return {broadcast,messages:chat.messages,viewers,participants,status,error,refresh:() => refreshRef.current()}
+  const profilesById=new Map(roomProfiles.map(profile=>[profile.user_id,profile]))
+  const verifiedParticipants=participants.map(person=>{const saved=profilesById.get(person.id);return saved?{...person,nickname:saved.nickname,color:nicknameColor(person.id,saved.nickname_color),is_admin:saved.is_admin}:person})
+  return {broadcast,messages:chat.messages,viewers,participants:verifiedParticipants,status,error,refresh:() => refreshRef.current()}
 }

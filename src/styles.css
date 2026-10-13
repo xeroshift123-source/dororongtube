@@ -1,4 +1,8 @@
 @import "tailwindcss";
+.admin-badge { display: inline-flex; vertical-align: -2px; margin-left: 4px; color: #c1acff; }
+.moderation-feedback { padding: 8px 12px; font-size: 12px; color: #d3bdfc; line-height: 1.5; flex-shrink: 0; }
+.viewer-popover li[aria-haspopup]:focus-visible { outline: 1px solid #c1acff; border-radius: 4px; }
+.player-controls-hint { flex-basis: 100%; line-height: 1.6; }
 .profile-settings-button { max-width: 180px; }
 .profile-button-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .profile-settings-button svg { flex-shrink: 0; }
@@ -93,25 +97,30 @@
 .chat-header, .chat-guideline, .chat-composer { flex-shrink: 0; }
 /* Keep the composer visible: only chat history scrolls in stacked layouts. */
 @media (max-width: 760px), (max-aspect-ratio: 1/1) {
-  .app-shell:has(.watch-layout) { height: 100dvh; min-height: 0; overflow: hidden; padding-bottom: max(8px, env(safe-area-inset-bottom)); }
+  .app-shell:has(.watch-layout) { height: 100dvh; min-height: 0; overflow-y: auto; padding-bottom: max(8px, env(safe-area-inset-bottom)); }
   .app-shell:has(.watch-layout) > .site-header { flex-shrink: 0; }
   .app-shell:has(.watch-layout) > main { display: flex; flex-direction: column; flex: 1; min-height: 0; width: 100%; max-width: none; }
   .app-shell:has(.watch-layout) .room-toolbar { padding-block: 8px; flex-shrink: 0; }
   .app-shell .watch-layout { display: flex; flex-direction: column; flex: 1; min-height: 0; max-width: none; gap: 10px; }
   .watch-layout > .watch-main { flex-shrink: 0; width: 100%; }
-  .watch-layout .player-frame { height: min(calc((100vw - 32px) * 9 / 16), 32dvh); min-height: 0; aspect-ratio: auto; }
+  .watch-layout .player-frame { height: min(calc((100vw - 32px) * 9 / 16), 26dvh); min-height: 0; aspect-ratio: auto; }
   .watch-layout .waiting { min-height: 0; padding: 10px; }
   .watch-layout .waiting-icon { margin-bottom: 6px; }
   .watch-layout .waiting-icon svg { width: 28px; height: 28px; }
   .watch-layout .waiting h2 { font-size: 18px; margin: 6px 0; }
   .watch-layout .waiting-label { margin-top: 8px; }
-  .watch-layout > .chat-panel { flex: 1; height: auto; min-height: 0; contain: none; width: 100%; }
+  .watch-layout > .chat-panel { flex: 1; height: auto; min-height: 280px; contain: none; width: 100%; }
   .watch-layout .chat-header { padding: 10px 14px; }
   .watch-layout .chat-guideline { padding: 7px 14px; }
   .watch-layout .message-list { padding: 6px 14px; }
-  .watch-layout .chat-composer { padding: 9px 12px; }
-  .watch-layout .composer-identity { margin-bottom: 6px; }
-  .watch-layout .chat-composer textarea { min-height: 48px; padding: 8px 10px; }
+  .watch-layout .chat-composer { display: grid; grid-template-columns: minmax(0, 1fr) 40px; gap: 6px 8px; padding: 8px 12px; }
+  .watch-layout .composer-identity { grid-column: 1 / -1; margin-bottom: 0; }
+  .watch-layout .chat-composer textarea { display: block; height: 42px; min-height: 42px; padding: 8px 10px; line-height: 24px; }
+  .watch-layout .composer-bottom { display: contents; }
+  .watch-layout .composer-bottom > span { display: none; }
+  .watch-layout .composer-bottom > button { width: 40px; height: 42px; padding: 0; }
+  .watch-layout .chat-composer > .error { grid-column: 1 / -1; }
+  .watch-layout .new-messages { bottom: 86px; }
   .app-shell:has(.watch-layout) > footer { display: none; }
 }
 @media (max-height: 600px) and (max-width: 760px), (max-height: 600px) and (max-aspect-ratio: 1/1) {

@@ -58,7 +58,7 @@ Supabase cron은 프로젝트 설정 시간대(일반적으로 UTC)를 확인합
 - DevTools 오프라인 → 복귀, 소켓 단절, 토큰 갱신, 절전 복귀 후 최신 방송/최근 채팅/삭제 복구를 확인합니다. Supabase SDK가 지수 백오프로 재구독하며, 앱은 subscribe/online/visible에서 최신 데이터를 재조회합니다.
 - 두 탭의 동일 UID는 한 명, 다른 브라우저는 다른 사람으로 집계되는지 확인하고, 마지막 탭 종료 후 heartbeat timeout 안에 제거되는지 확인합니다.
 - 일반 JWT로 set_broadcast/delete_message/mute_user/공지 RPC 및 직접 테이블 쓰기를 호출해 거부되는지 확인합니다. private Broadcast 직접 송신도 거부되어야 합니다.
-- 동일 UUID 재전송, 메시지 폭주, 500자 초과, 공백, HTML 문자열, 중복 이벤트/순서 역전, 관리자의 동시 방송 수정, mute/해제를 확인합니다.
+- 동일 UUID 재전송, 메시지 폭주, 일반 채팅 50자 초과(공지 500자 초과), 공백, HTML 문자열, 중복 이벤트/순서 역전, 관리자의 동시 방송 수정, mute/해제를 확인합니다.
 - DB cron, 익명 가입 rate limit, CAPTCHA, Realtime private-only, API 권한, 운영자 테이블, 환경 변수의 secret 노출 여부를 확인합니다.
 
 ## 남은 개선
